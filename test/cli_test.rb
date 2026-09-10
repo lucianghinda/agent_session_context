@@ -2,8 +2,11 @@
 
 require "test_helper"
 require_relative "support/fake_summarizer"
+require_relative "support/claude_fixtures"
 
 class CLITest < Minitest::Test
+  include ClaudeFixtures
+
   Session = Data.define(:id, :uid, :agent, :project_path)
   FakeConfig = Data.define(:timeout_seconds)
   PromptsResult = Data.define(:prompts, :reader_warnings, :partial_capture?) do
@@ -43,15 +46,17 @@ class CLITest < Minitest::Test
   end
 
   class FakeBuilder
-    attr_reader :show_calls, :prompts_calls, :prompts_result_calls, :summarize_calls
+    attr_reader :show_calls, :prompts_calls, :prompts_result_calls, :loop_calls, :summarize_calls
 
-    def initialize(show_result: nil, prompts_result: nil, summarize_result: nil)
+    def initialize(show_result: nil, prompts_result: nil, loop_result: nil, summarize_result: nil)
       @show_result = show_result
       @prompts_result = prompts_result
+      @loop_result = loop_result
       @summarize_result = summarize_result
       @show_calls = []
       @prompts_calls = []
       @prompts_result_calls = []
+      @loop_calls = []
       @summarize_calls = []
     end
 
@@ -68,6 +73,11 @@ class CLITest < Minitest::Test
     def prompts_result(session)
       @prompts_result_calls << session
       @prompts_result
+    end
+
+    def loop(session)
+      @loop_calls << session
+      @loop_result
     end
 
     def summarize(session, summarizer:)
@@ -591,6 +601,115 @@ class CLITest < Minitest::Test
       assert_includes err, "warning: #{session.uid}:"
       assert_includes err, "too large to read"
     end
+  end
+
+  def test_loop_prints_the_ascii_view_and_exits_zero
+    session = build_session(agent: :codex, id: "session-4")
+    resolver = FakeResolver.new(resolve_result: session)
+    builder = FakeBuilder.new(loop_result: build_loop(session))
+
+    status, out, err = run_cli("loop", session.uid, resolver:, builder:)
+
+    assert_equal 0, status
+    assert_equal "", err, "loop prints no secrets warning: it renders sizes and tool names only"
+    assert_equal [{ identifier: session.uid, agent: nil }], resolver.resolve_calls
+    assert_equal [session], builder.loop_calls
+    assert_includes out, "session #{session.uid}"
+    assert_includes out, "ending:"
+    assert out.end_with?("\n")
+    refute out.end_with?("\n\n")
+  end
+
+  def test_loop_supports_text_markdown_and_json_formats
+    session = build_session(agent: :codex, id: "session-5")
+
+    {
+      "text" => proc do |out|
+        assert_includes out, "session #{session.uid}"
+        assert out.end_with?("\n")
+        refute out.end_with?("\n\n")
+      end,
+      "markdown" => proc do |out|
+        assert out.start_with?("# session")
+        assert out.end_with?("\n")
+        refute out.end_with?("\n\n")
+      end,
+      "json" => proc do |out|
+        payload = JSON.parse(out)
+        assert_equal true, payload.dig("ending", "inferred")
+        refute out.end_with?("\n")
+      end
+    }.each do |format, assertion|
+      resolver = FakeResolver.new(resolve_result: session)
+      builder = FakeBuilder.new(loop_result: build_loop(session))
+
+      status, out, err = run_cli("loop", session.uid, "--format", format, resolver:, builder:)
+
+      assert_equal 0, status, "expected loop #{format} to succeed"
+      assert_equal "", err
+      assertion.call(out)
+    end
+  end
+
+  def test_loop_jsonl_format_emits_one_object_per_round_trip
+    with_session([user_turn("hi"), assistant_turn("hello there")]) do |reader|
+      session = reader.session
+      loop = Agent::SessionContext::Loop.for(reader)
+      resolver = FakeResolver.new(resolve_result: session)
+      builder = FakeBuilder.new(loop_result: loop)
+
+      status, out, err = run_cli("loop", session.uid, "--format", "jsonl", resolver:, builder:)
+
+      assert_equal 0, status
+      assert_equal "", err
+      lines = out.split("\n")
+      assert_equal loop.round_trips.size, lines.length
+      refute out.end_with?("\n")
+      lines.each { |line| JSON.parse(line) }
+    end
+  end
+
+  def test_loop_current_disk_fallback_works_through_the_resolver
+    session = build_session(agent: :codex, id: "session-3")
+    resolver = FakeResolver.new(current_result: session, current_fallback: true)
+    builder = FakeBuilder.new(loop_result: build_loop(session))
+
+    status, out, err = run_cli("loop", "--current", "--agent", "codex", resolver:, builder:)
+
+    assert_equal 0, status
+    assert_equal [{ agent: :codex }], resolver.current_calls
+    assert_equal(
+      "warning: --current found no session environment identifier; using latest session on disk: codex:session-3\n",
+      err
+    )
+    assert_includes out, "session codex:session-3"
+  end
+
+  def test_loop_requires_session_or_current
+    status, out, err = run_cli("loop")
+
+    assert_equal 1, status
+    assert_equal "", out
+    assert_equal "pass SESSION or --current\n", err
+  end
+
+  def test_loop_with_warnings_exits_nonzero_and_the_warnings_reach_stderr
+    session = build_session(agent: :codex, id: "session-9")
+    builder = FakeBuilder.new(loop_result: build_loop(session, warnings: ["tool result toolu_x answers no call"]))
+
+    status, out, err = run_cli("loop", session.uid, resolver: FakeResolver.new(resolve_result: session), builder:)
+
+    assert_equal 1, status
+    assert_equal "warning: #{session.uid}: tool result toolu_x answers no call\n", err
+    assert_includes out, "session #{session.uid}"
+  end
+
+  def test_help_lists_loop
+    status, out, err = run_cli("help")
+
+    assert_equal 0, status
+    assert_equal "", err
+    assert_includes out, "loop"
   end
 
   def test_summarize_with_real_reader_warning_keeps_json_valid_and_returns_nonzero
@@ -1382,6 +1501,22 @@ class CLITest < Minitest::Test
 
   def build_prompts_result(prompts, reader_warnings: [])
     PromptsResult.new(prompts:, reader_warnings:)
+  end
+
+  # An empty Loop (no round trips recorded) is enough for the CLI-level
+  # tests here: they cover dispatch, format selection, and exit codes, not
+  # LoopView's own rendering, which loop_view_test.rb already covers in
+  # full against real round trips.
+  def build_loop(session, warnings: [])
+    Agent::SessionContext::Loop.new(
+      session:,
+      round_trips: [],
+      tool_calls: [],
+      speakers: {},
+      ending: :empty,
+      recorded: false,
+      warnings:
+    )
   end
 
   def ref(session_uid, message_index, part_index)

@@ -33,6 +33,10 @@ module Agent
         case (command = @argv.shift)
         when "show" then show
         when "prompts" then prompts
+        # Named loop_command, not loop: Kernel#loop is an instance method
+        # available everywhere, and a method named `loop` on this CLI object
+        # would shadow it for the rest of this instance.
+        when "loop" then loop_command
         when "summarize" then summarize
         when "version", "--version", "-v" then version(@argv)
         when nil then help([], @stdout, 0)
@@ -75,6 +79,20 @@ module Agent
         prompts_result.partial_capture? ? 1 : 0
       end
 
+      # No "may contain secrets" stderr warning here, unlike show and
+      # prompts: this view prints byte sizes and tool names, never prompt or
+      # tool-result bodies (LoopView's own privacy rule), so its output is
+      # always safe to paste anywhere.
+      def loop_command
+        @current_format = Options.hinted_format(@argv)
+        selection = Options.parse(@argv, command: :loop)
+        session = resolve_session(selection)
+        loop = @builder.loop(session)
+        emit_warnings(session.uid, loop.warnings)
+        write_output(loop, format: selection.fetch(:format))
+        loop.warnings.empty? ? 0 : 1
+      end
+
       def summarize
         @current_format = Options.hinted_format(@argv)
         selection = Options.parse(@argv, command: :summarize)
@@ -104,6 +122,7 @@ module Agent
           Commands:
             show
             prompts
+            loop
             summarize
             version
             help
@@ -118,6 +137,12 @@ module Agent
             --include-injected  Include deduplicated full injected text
             Excludes assistant messages, thinking, tool-result bodies,
             and raw provider envelopes.
+
+          Loop behavior:
+            Shows the session as the agent loop: prompts, model round trips,
+            tool calls paired with their results, and where it stopped.
+            Prints byte sizes and tool names, never bodies. Deterministic;
+            the ending is always labelled inferred.
 
           Summarize options:
             --using auto|claude|codex
