@@ -1,6 +1,6 @@
 # Agent Session Context
 
-[![Build](https://github.com/lucianghinda/agent-session-context/actions/workflows/main.yml/badge.svg)](https://github.com/lucianghinda/agent-session-context/actions/workflows/main.yml)
+[![Build](https://github.com/lucianghinda/agent_session_context/actions/workflows/main.yml/badge.svg)](https://github.com/lucianghinda/agent_session_context/actions/workflows/main.yml)
 [![Ruby](https://img.shields.io/badge/ruby-%3E%3D%203.2-red.svg)](https://www.ruby-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.txt)
 
@@ -13,7 +13,7 @@ Use Ruby 3.2 or newer.
 Add this line to your application's **Gemfile**:
 
 ```ruby
-gem "agent-session_context"
+gem "agent_session_context"
 ```
 
 Then run:
@@ -259,7 +259,7 @@ Open a pull request with tests and documentation.
 
 Follow [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
-Report bugs through [GitHub Issues](https://github.com/lucianghinda/agent-session-context/issues).
+Report bugs through [GitHub Issues](https://github.com/lucianghinda/agent_session_context/issues).
 
 ## License
 

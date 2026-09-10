@@ -39,7 +39,7 @@ class ReadmeContractTest < Minitest::Test
   def test_readme_links_to_the_current_repository
     readme = File.read(README_PATH)
 
-    assert_includes readme, "https://github.com/lucianghinda/agent-session-context"
+    assert_includes readme, "https://github.com/lucianghinda/agent_session_context"
     refute_includes readme, "https://github.com/lucianghinda/agent_context"
   end
 
