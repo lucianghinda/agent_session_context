@@ -25,6 +25,6 @@ Gem::Specification.new do |spec|
   spec.bindir = "exe"
   spec.executables = ["agent-session-context"]
   spec.require_paths = ["lib"]
-  spec.add_dependency "agent_sessions", "~> 0.3"
+  spec.add_dependency "agent_sessions", "~> 0.4"
   spec.add_dependency "zeitwerk", "~> 2.8"
 end

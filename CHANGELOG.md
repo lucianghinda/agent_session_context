@@ -2,6 +2,7 @@
 
 ## [1.0.0] - 2026-09-10
 
+- Require `agent_sessions` 0.4, which adds the round-trip grouping the `loop` command is built on.
 - **BREAKING**: the gem is now distributed as `agent_session_context`. The
   namespace, require path, and executable are unchanged; users change only
   the Gemfile line.
