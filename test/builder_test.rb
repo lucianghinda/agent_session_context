@@ -2,8 +2,11 @@
 
 require "test_helper"
 require_relative "support/fake_summarizer"
+require_relative "support/claude_fixtures"
 
 class BuilderTest < Minitest::Test
+  include ClaudeFixtures
+
   FakeConfig = Data.define(:timeout_seconds)
 
   FakeReader = Struct.new(:messages, :warnings) do
@@ -181,6 +184,29 @@ class BuilderTest < Minitest::Test
     assert_equal ["reader warning"], prompts_result.reader_warnings
     assert_equal true, prompts_result.partial_capture?
     assert_equal ["First prompt", "Secondpart"], builder.prompts(session).map(&:text)
+  end
+
+  # Builder#loop just wires the catalog's reader into Loop.for — the pairing
+  # and ending logic already has its own coverage in loop_test.rb, so this
+  # only pins the wiring itself: the reader the catalog returns is the one
+  # Loop reads from.
+  def test_loop_builds_a_loop_from_the_readers_round_trips
+    call = { type: "tool_use", id: "toolu_1", name: "Read", input: { file_path: "/tmp/x" } }
+    result = { type: "tool_result", tool_use_id: "toolu_1", content: "file contents" }
+
+    with_session([user_turn("read the file"), assistant_parts([call]), user_parts([result])]) do |reader|
+      session = reader.session
+      catalog = ReadCatalog.new(session.uid => reader)
+      builder = Agent::SessionContext::Builder.new(catalog:, now: fixed_time)
+
+      loop = builder.loop(session)
+
+      assert_instance_of Agent::SessionContext::Loop, loop
+      assert_equal 1, catalog.read_calls.fetch(session.uid)
+      assert_equal session.uid, loop.session.uid
+      assert_equal ["Read"], loop.tool_calls.map(&:name)
+      assert loop.tool_calls.first.answered?
+    end
   end
 
   def test_summarize_combines_observed_and_semantic_items_and_metadata
@@ -447,7 +473,7 @@ class BuilderTest < Minitest::Test
 
   def test_session_context_singleton_public_api_is_exact_for_this_gem
     assert_equal(
-      %i[current prompts resolve show summarize],
+      %i[current loop prompts resolve show summarize],
       Agent::SessionContext.singleton_class.public_instance_methods(false).sort
     )
   end

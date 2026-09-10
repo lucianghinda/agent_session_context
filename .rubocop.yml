@@ -21,10 +21,11 @@ Lint/UnusedMethodArgument:
   Exclude:
     - "test/**/*"
 
-# Item owns this validation constant inside its Data-defined class body.
+# Item and Loop each own a constant inside their Data-defined class body.
 Lint/ConstantDefinitionInBlock:
   Exclude:
     - "lib/agent/session_context/item.rb"
+    - "lib/agent/session_context/loop.rb"
 
 Style/StringLiterals:
   EnforcedStyle: double_quotes
