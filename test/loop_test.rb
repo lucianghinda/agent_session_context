@@ -2,9 +2,11 @@
 
 require "test_helper"
 require_relative "support/claude_fixtures"
+require_relative "support/codex_fixtures"
 
 class LoopTest < Minitest::Test
   include ClaudeFixtures
+  include CodexFixtures
 
   # Pairing must go by call id: two calls can be in flight at once, and
   # pairing by position would match the wrong call to the wrong result.
@@ -71,12 +73,76 @@ class LoopTest < Minitest::Test
     end
   end
 
-  def test_the_ending_says_the_session_stops_on_a_record_the_model_did_not_write
+  def test_the_ending_describes_the_last_record_without_claiming_the_session_stopped
     with_session([assistant_turn("hello there"), user_turn("thanks")]) do |reader|
       loop = Agent::SessionContext::Loop.for(reader)
 
       assert_equal :not_a_model_record, loop.ending
-      assert_equal "the session stops on a record the model did not write", loop.ending_detail
+      assert_equal "the last recorded entry is not an assistant answer", loop.ending_detail
+    end
+  end
+
+  def test_codex_commentary_and_reasoning_are_incomplete
+    [codex_message("Working on it", phase: "commentary"), codex_reasoning,
+     codex_reasoning(summary: [{ type: "summary_text", text: "Considering options" }])].each do |record|
+      with_codex_session([record]) do |reader|
+        loop = Agent::SessionContext::Loop.for(reader)
+
+        assert_equal :incomplete, loop.ending
+        assert loop.ending_inferred?
+        assert_equal "the last assistant record is commentary or reasoning, not a final answer", loop.ending_detail
+      end
+    end
+  end
+
+  def test_codex_final_answer_and_legacy_messages_remain_inferred_answers
+    [codex_message("Done", phase: "final_answer"), codex_message("Legacy answer")].each do |record|
+      with_codex_session([codex_reasoning, record]) do |reader|
+        loop = Agent::SessionContext::Loop.for(reader)
+
+        assert_equal :answered, loop.ending
+        assert loop.ending_inferred?
+      end
+    end
+  end
+
+  def test_codex_non_assistant_tails_remain_not_a_model_record
+    [codex_tool_result, codex_message("Thanks", role: "user"),
+     codex_record({ type: "future_record" })].each do |record|
+      with_codex_session([codex_tool_call, record]) do |reader|
+        loop = Agent::SessionContext::Loop.for(reader)
+
+        assert_equal :not_a_model_record, loop.ending
+        assert loop.ending_inferred?
+      end
+    end
+  end
+
+  def test_codex_tool_call_ending_is_unchanged
+    with_codex_session([codex_tool_call]) do |reader|
+      assert_equal :stopped_in_the_loop, Agent::SessionContext::Loop.for(reader).ending
+    end
+  end
+
+  def test_codex_ending_guards_raw_shapes_and_other_agents
+    with_codex_session([codex_message("Legacy answer")]) do |reader|
+      trip = reader.round_trips.last
+      [nil, [], "raw", {}, { "type" => "response_item", "payload" => [] },
+       { "type" => "other", "payload" => { "type" => "reasoning" } }].each do |raw|
+        modified = trip.with(messages: [trip.messages.last.with(raw: raw)])
+        snapshot = Struct.new(:session, :round_trips, :warnings).new(reader.session, [modified], [])
+
+        assert_equal :answered, Agent::SessionContext::Loop.for(snapshot).ending
+      end
+    end
+
+    with_session([assistant_turn("Claude answer")]) do |reader|
+      trip = reader.round_trips.last
+      raw = { "type" => "response_item", "payload" => { "type" => "reasoning" } }
+      modified = trip.with(messages: [trip.messages.last.with(raw: raw)])
+      snapshot = Struct.new(:session, :round_trips, :warnings).new(reader.session, [modified], [])
+
+      assert_equal :answered, Agent::SessionContext::Loop.for(snapshot).ending
     end
   end
 

@@ -3,9 +3,11 @@
 require "test_helper"
 require_relative "support/fake_summarizer"
 require_relative "support/claude_fixtures"
+require_relative "support/codex_fixtures"
 
 class CLITest < Minitest::Test
   include ClaudeFixtures
+  include CodexFixtures
 
   Session = Data.define(:id, :uid, :agent, :project_path)
   FakeConfig = Data.define(:timeout_seconds)
@@ -710,6 +712,58 @@ class CLITest < Minitest::Test
     assert_equal 0, status
     assert_equal "", err
     assert_includes out, "loop"
+  end
+
+  def test_loop_human_formats_emit_warnings_only_on_stderr
+    session = build_session(agent: :codex, id: "session-warning")
+    warning = "line 2: unrecognized record type telepathy"
+    %w[text markdown].each do |format|
+      builder = FakeBuilder.new(loop_result: build_loop(session, warnings: [warning]))
+      status, out, err = run_cli("loop", session.uid, "--format", format,
+                                 resolver: FakeResolver.new(resolve_result: session), builder:)
+      assert_equal 1, status
+      assert_equal "warning: #{session.uid}: #{warning}\n", err
+      refute_includes out, warning
+    end
+  end
+
+  def test_loop_json_preserves_structured_warnings
+    session = build_session(agent: :codex, id: "session-warning")
+    warning = "line 2: unrecognized record type telepathy"
+    builder = FakeBuilder.new(loop_result: build_loop(session, warnings: [warning]))
+    status, out, err = run_cli("loop", session.uid, "--format", "json",
+                               resolver: FakeResolver.new(resolve_result: session), builder:)
+    assert_equal 1, status
+    assert_equal [warning], JSON.parse(out).fetch("warnings")
+    assert_equal "warning: #{session.uid}: #{warning}\n", err
+  end
+
+  def test_codex_accounting_is_not_a_loop_entry_or_cli_warning
+    records = [codex_message("hello", role: "user"), codex_message("checking", phase: "commentary"),
+               codex_reasoning, codex_tool_call, codex_token_usage, codex_tool_result,
+               codex_message("done", phase: "final_answer"), codex_token_usage]
+    with_codex_session(records) do |reader|
+      %w[text markdown json jsonl].each do |format|
+        status, out, err = run_cli("loop", reader.session.uid, "--format", format,
+                                   resolver: FakeResolver.new(resolve_result: reader.session),
+                                   builder: Agent::SessionContext::Builder.new)
+        assert_equal 0, status
+        assert_empty err
+        refute_includes out, "token_usage_record"
+        if format == "json"
+          data = JSON.parse(out)
+          assert_equal 6, data.fetch("round_trips").size
+          assert_equal 1, data.fetch("tool_calls").size
+          assert data.fetch("tool_calls").first.fetch("answered")
+          assert_equal "answered", data.dig("ending", "name")
+        elsif format == "jsonl"
+          assert_equal 6, out.lines.size
+        else
+          assert_includes out, "entries: 6"
+          assert_includes out, "model entries: 4"
+        end
+      end
+    end
   end
 
   def test_summarize_with_real_reader_warning_keeps_json_valid_and_returns_nonzero

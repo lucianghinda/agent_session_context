@@ -17,16 +17,15 @@ module Agent
       # it say the same words.
       ENDINGS = {
         answered: "the model answered without asking for a tool",
+        incomplete: "the last assistant record is commentary or reasoning, not a final answer",
         stopped_in_the_loop: "a tool was asked for and nothing answered it",
-        not_a_model_record: "the session stops on a record the model did not write",
-        empty: "no round trips were recorded"
+        not_a_model_record: "the last recorded entry is not an assistant answer",
+        empty: "no entries were recorded"
       }.freeze
 
-      # Always true: no store on disk records WHY a session stopped — the
-      # on-disk transcript holds no stop reason and no turn count, because
-      # those live in the streamed output of a non-interactive run, not in
-      # the session file. So the ending is always deduced, and must always
-      # be labelled as such rather than presented as a recorded fact.
+      # This snapshot's ending is inferred from its last entry. Some stores
+      # record lifecycle events, but this view does not yet normalize them
+      # into termination reasons or establish that a session cannot resume.
       def ending_inferred? = true
 
       def ending_detail = ENDINGS.fetch(ending)
@@ -45,7 +44,7 @@ module Agent
           trips.each { |trip| speakers[trip.index] = speaker_of(trip, warnings) }
           calls = pair(trips, warnings)
           new(session: reader.session, round_trips: trips, tool_calls: calls, speakers: speakers,
-              ending: ending_for(trips, speakers), recorded: trips.any? && trips.all?(&:recorded),
+              ending: ending_for(trips, speakers, reader.session), recorded: trips.any? && trips.all?(&:recorded),
               warnings: reader.warnings + warnings)
         end
 
@@ -107,14 +106,27 @@ module Agent
           calls
         end
 
-        def ending_for(round_trips, speakers)
+        def ending_for(round_trips, speakers, session)
           return :empty if round_trips.empty?
 
           last = round_trips.last
           return :not_a_model_record unless speakers[last.index] == :model
           return :stopped_in_the_loop if last.calls.any?
+          return :incomplete if session.agent == :codex && codex_incomplete?(last.messages.last)
 
           :answered
+        end
+
+        def codex_incomplete?(message)
+          return false unless message&.role == :assistant
+
+          raw = message.raw
+          return false unless raw.is_a?(Hash) && raw["type"] == "response_item"
+
+          payload = raw["payload"]
+          return false unless payload.is_a?(Hash)
+
+          payload["type"] == "reasoning" || (payload["type"] == "message" && payload["phase"] == "commentary")
         end
       end
     end

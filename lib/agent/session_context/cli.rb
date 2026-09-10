@@ -89,7 +89,11 @@ module Agent
         session = resolve_session(selection)
         loop = @builder.loop(session)
         emit_warnings(session.uid, loop.warnings)
-        write_output(loop, format: selection.fetch(:format))
+        format = selection.fetch(:format)
+        # Human CLI diagnostics are already on stderr. Standalone views and
+        # structured output retain the original warnings.
+        output = human_format?(format) ? loop.with(warnings: []) : loop
+        write_output(output, format:)
         loop.warnings.empty? ? 0 : 1
       end
 
@@ -139,8 +143,8 @@ module Agent
             and raw provider envelopes.
 
           Loop behavior:
-            Shows the session as the agent loop: prompts, model round trips,
-            tool calls paired with their results, and where it stopped.
+            Shows prompts, model entries, tool calls paired with their results,
+            and the last recorded state. Entries are not a count of API requests.
             Prints byte sizes and tool names, never bodies. Deterministic;
             the ending is always labelled inferred.
 

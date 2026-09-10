@@ -16,11 +16,8 @@ module Agent
     # it, and a local time would make that false for a fact (the
     # recorded instant) that has not actually changed.
     #
-    # The ending is always printed as inferred, because Loop#ending is
-    # always a deduction — no on-disk transcript records WHY a session
-    # stopped, since that fact lives in a non-interactive run's streamed
-    # output, never in the file itself. Printing it as a plain fact would
-    # claim information the file does not hold.
+    # The ending describes the last normalized entry in this snapshot.
+    # It remains inferred: the session can resume after it was read.
     class LoopView
       YOU_LANE = 2
       HARNESS_LANE = 15
@@ -39,7 +36,8 @@ module Agent
       def ascii
         lines = [
           "session #{@loop.session.uid}",
-          "round trips: #{@loop.round_trips.size}  (grouping: #{grouping})",
+          "entries: #{@loop.round_trips.size}  (grouping: #{grouping})",
+          "model entries: #{model_entry_count}",
           "tool calls: #{@loop.tool_calls.size}  (#{unanswered_count} unanswered)",
           "",
           ascii_header
@@ -55,9 +53,10 @@ module Agent
 
       def markdown
         lines = ["# session #{@loop.session.uid}", "",
-                 "- round trips: #{@loop.round_trips.size} (grouping: #{grouping})",
+                 "- entries: #{@loop.round_trips.size} (grouping: #{grouping})",
+                 "- model entries: #{model_entry_count}",
                  "- tool calls: #{@loop.tool_calls.size} (#{unanswered_count} unanswered)",
-                 "", "## Round trips", ""]
+                 "", "## Entries", ""]
         @loop.round_trips.each { |trip| lines << markdown_round_trip(trip) }
         lines << "" << "## Tool calls" << ""
         lines.concat(markdown_tool_calls_table)
@@ -105,14 +104,16 @@ module Agent
       # direction. So say how many, and let the two cases differ visibly.
       def grouping
         named = @loop.round_trips.count(&:recorded)
-        return "no round trips" if @loop.round_trips.empty?
+        return "no entries" if @loop.round_trips.empty?
         return "all #{named} named by the store" if named == @loop.round_trips.size
-        return "none named by the store; one round trip per message" if named.zero?
+        return "none named by the store; one entry per message" if named.zero?
 
         "#{named} of #{@loop.round_trips.size} named by the store"
       end
 
       def unanswered_count = @loop.tool_calls.count { |call| !call.answered? }
+
+      def model_entry_count = @loop.speakers.count { |_index, speaker| speaker == :model }
 
       def ascii_header
         line = "#{lane("YOU", YOU_LANE).ljust(HARNESS_LANE)}HARNESS"
@@ -135,10 +136,12 @@ module Agent
       end
 
       def ascii_model(trip)
-        lines = [lane("#{trip.index} == round trip ==>", HARNESS_LANE)]
+        label = trip.recorded ? "round trip" : "message"
+        lines = [lane("#{trip.index} == #{label} ==>", HARNESS_LANE)]
+        lines << lane("reasoning (no readable summary recorded)", MODEL_LANE) if unreadable_reasoning?(trip)
         trip.parts.each { |part| lines << lane(part_line(part), MODEL_LANE) }
         lines << lane(usage_line(trip.usage), MODEL_LANE) if trip.usage
-        verdict = trip.calls.any? ? "tool_use: keep looping" : "no tool_use: exit"
+        verdict = trip.calls.any? ? "tool request recorded" : "no tool request in this record"
         lines << lane("#{trip.index} <== #{verdict}", HARNESS_LANE)
       end
 
@@ -203,9 +206,20 @@ module Agent
       end
 
       def markdown_parts(trip)
+        return "reasoning (no readable summary recorded)" if unreadable_reasoning?(trip)
         return "(no parts)" if trip.parts.empty?
 
         trip.parts.map { |part| part_line(part) }.join("; ")
+      end
+
+      def unreadable_reasoning?(trip)
+        return false unless @loop.session.agent == :codex && trip.parts.empty?
+
+        trip.messages.any? do |message|
+          raw = message.raw
+          raw.is_a?(Hash) && raw["type"] == "response_item" &&
+            raw["payload"].is_a?(Hash) && raw["payload"]["type"] == "reasoning"
+        end
       end
 
       def markdown_tool_calls_table

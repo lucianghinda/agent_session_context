@@ -1,5 +1,13 @@
 ## [Unreleased]
 
+- Require `agent_sessions` 0.4.1 or later for Codex token-accounting compatibility.
+- Describe loop counts as entries and model entries, and replace per-record exit claims
+  with observed tool-request labels. JSON field names and grouping flags are unchanged.
+- Show an explicit label for Codex reasoning without a readable summary and infer
+  `incomplete` for commentary or reasoning tails. `incomplete` is a new public ending value.
+- Emit loop warnings once on stderr for human CLI formats, preserving warnings in
+  standalone views and JSON.
+
 ## [1.0.0] - 2026-09-10
 
 - Require `agent_sessions` 0.4, which adds the round-trip grouping the `loop` command is built on.
