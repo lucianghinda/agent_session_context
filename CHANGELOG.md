@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+## [1.0.0] - 2026-09-10
+
+- **BREAKING**: the gem is now distributed as `agent_session_context`. The
+  namespace, require path, and executable are unchanged; users change only
+  the Gemfile line.
+
 ## [0.1.0] - 2026-09-01
 
 - Use the `agent-session_context` distribution, `Agent::SessionContext`
