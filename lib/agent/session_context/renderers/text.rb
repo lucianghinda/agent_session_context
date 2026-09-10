@@ -19,6 +19,12 @@ module Agent
         private_constant :SECTION_ORDER
 
         def call(value)
+          # LoopView already renders sizes and tool names only, never bodies —
+          # printing it here instead of routing the Loop through Serializer is
+          # what keeps that guarantee: Serializer walks a Data object's members
+          # generically, and Loop's round trips carry the raw on-disk record.
+          return LoopView.new(value).ascii.chomp if value.is_a?(Loop)
+
           if value.is_a?(Snapshot)
             render_snapshot(value)
           else

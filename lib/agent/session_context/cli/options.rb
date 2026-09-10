@@ -55,6 +55,7 @@ module Agent
         COMMANDS = {
           show: { formats: %i[text markdown json], options: %i[current agent format include_injected] }.freeze,
           prompts: { formats: %i[text markdown json jsonl], options: %i[current agent format] }.freeze,
+          loop: { formats: %i[text markdown json jsonl], options: %i[current agent format] }.freeze,
           summarize: { formats: %i[text markdown json], options: %i[current agent format using timeout] }.freeze,
           help: { formats: nil, options: [].freeze }.freeze,
           version: { formats: nil, options: [].freeze }.freeze

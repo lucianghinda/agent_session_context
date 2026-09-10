@@ -31,6 +31,10 @@ module Agent
         Builder.new(**).prompts(session)
       end
 
+      def loop(session, **)
+        Builder.new(**).loop(session)
+      end
+
       def summarize(
         session,
         using: nil,

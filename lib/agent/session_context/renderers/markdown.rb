@@ -19,6 +19,10 @@ module Agent
         private_constant :SECTION_ORDER
 
         def call(value)
+          # Same reason as Renderers::Text#call: render the Loop directly so
+          # its raw on-disk records never pass through the generic Serializer.
+          return LoopView.new(value).markdown.chomp if value.is_a?(Loop)
+
           if value.is_a?(Snapshot)
             render_snapshot(value)
           else

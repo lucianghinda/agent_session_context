@@ -51,6 +51,10 @@ module Agent
         )
       end
 
+      def loop(session)
+        Loop.for(@catalog.read(session))
+      end
+
       def summarize(session, summarizer:)
         transcript = capture(session)
         observed = @collector.call(transcript)

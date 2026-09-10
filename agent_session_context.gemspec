@@ -2,10 +2,10 @@
 
 require_relative "lib/agent/session_context/version"
 
-repository_uri = "https://github.com/lucianghinda/agent-session-context"
+repository_uri = "https://github.com/lucianghinda/agent_session_context"
 
 Gem::Specification.new do |spec|
-  spec.name = "agent-session_context"
+  spec.name = "agent_session_context"
   spec.version = Agent::SessionContext::VERSION
   spec.authors = ["Lucian Ghinda"]
   spec.email = ["dev@ghinda.com"]
@@ -25,6 +25,6 @@ Gem::Specification.new do |spec|
   spec.bindir = "exe"
   spec.executables = ["agent-session-context"]
   spec.require_paths = ["lib"]
-  spec.add_dependency "agent_sessions", "~> 0.3"
+  spec.add_dependency "agent_sessions", "~> 0.4"
   spec.add_dependency "zeitwerk", "~> 2.8"
 end

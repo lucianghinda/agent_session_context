@@ -19,6 +19,10 @@ class ReadmeContractTest < Minitest::Test
     assert_includes public_api, "Agent::SessionContext::Snapshot"
     assert_includes public_api, "Agent::SessionContext.prompts"
     assert_includes public_api, "Agent::SessionContext::Prompt"
+    assert_includes public_api, "Agent::SessionContext.loop"
+    assert_includes public_api, "Agent::SessionContext::Loop"
+    assert_includes public_api, "Agent::SessionContext::ToolCall"
+    assert_includes public_api, "Agent::SessionContext::LoopView` is internal"
     assert_includes public_api, "Agent::SessionContext.summarize"
     assert_includes public_api, "Agent::SessionContext::InjectedContext"
     assert_includes public_api, "Agent::SessionContext::Item"
@@ -39,7 +43,7 @@ class ReadmeContractTest < Minitest::Test
   def test_readme_links_to_the_current_repository
     readme = File.read(README_PATH)
 
-    assert_includes readme, "https://github.com/lucianghinda/agent-session-context"
+    assert_includes readme, "https://github.com/lucianghinda/agent_session_context"
     refute_includes readme, "https://github.com/lucianghinda/agent_context"
   end
 

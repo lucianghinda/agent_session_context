@@ -10,15 +10,15 @@ class GemspecTest < Minitest::Test
       spec = load_gemspec(dir)
       expected_files = packaged_fixture_files
 
-      assert_equal "agent-session_context", spec.fetch("name")
+      assert_equal "agent_session_context", spec.fetch("name")
       assert_equal ["agent-session-context"], spec.fetch("executables")
-      assert_equal "https://github.com/lucianghinda/agent-session-context", spec.fetch("homepage")
+      assert_equal "https://github.com/lucianghinda/agent_session_context", spec.fetch("homepage")
       assert_equal ">= 3.2.0", spec.fetch("required_ruby_version").to_s
       assert_equal({
-                     "bug_tracker_uri" => "https://github.com/lucianghinda/agent-session-context/issues",
-                     "changelog_uri" => "https://github.com/lucianghinda/agent-session-context/blob/main/CHANGELOG.md",
+                     "bug_tracker_uri" => "https://github.com/lucianghinda/agent_session_context/issues",
+                     "changelog_uri" => "https://github.com/lucianghinda/agent_session_context/blob/main/CHANGELOG.md",
                      "rubygems_mfa_required" => "true",
-                     "source_code_uri" => "https://github.com/lucianghinda/agent-session-context"
+                     "source_code_uri" => "https://github.com/lucianghinda/agent_session_context"
                    }, spec.fetch("metadata"))
       assert_equal expected_files, spec.fetch("files")
       assert_equal %w[agent_sessions zeitwerk], spec.fetch("runtime_dependencies").map { |dep|
@@ -69,7 +69,7 @@ class GemspecTest < Minitest::Test
   private
 
   def copy_for_gemspec_test(destination)
-    (packaged_fixture_files + %w[Gemfile agent-session_context.gemspec test/load_test.rb]).uniq.each do |relative_path|
+    (packaged_fixture_files + %w[Gemfile agent_session_context.gemspec test/load_test.rb]).uniq.each do |relative_path|
       source = File.expand_path("../#{relative_path}", __dir__)
       target = File.join(destination, relative_path)
       FileUtils.mkdir_p(File.dirname(target))
@@ -122,7 +122,7 @@ class GemspecTest < Minitest::Test
     $VERBOSE = nil
 
     Dir.chdir(directory) do
-      spec = Gem::Specification.load("agent-session_context.gemspec")
+      spec = Gem::Specification.load("agent_session_context.gemspec")
       refute_nil spec
 
       {

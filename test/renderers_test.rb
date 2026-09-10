@@ -1,8 +1,11 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require_relative "support/claude_fixtures"
 
 class RenderersTest < Minitest::Test
+  include ClaudeFixtures
+
   def test_text_renderer_formats_snapshot_in_deterministic_section_order
     expected = <<~TEXT.chomp
       Session
@@ -721,6 +724,34 @@ class RenderersTest < Minitest::Test
     assert_equal "bad\ufffdtext", snapshot_json.fetch("files").first.fetch("detail")
     assert_equal ["bad\ufffdtext"], snapshot_json.fetch("warnings")
     assert_equal "bad\ufffdtext", ::JSON.parse(prompt_jsonl).fetch("text")
+  end
+
+  # This is the test that would have caught the leak: Serializer.serialize
+  # walks any Data object generically by its members, and Loop holds
+  # round_trips -> Message#raw, the full on-disk record. Every renderer must
+  # special-case Loop and render it through LoopView (sizes and tool names
+  # only) instead of handing the Loop itself to Serializer.
+  def test_no_renderer_leaks_a_loops_secrets_through_the_generic_serializer
+    call = { type: "tool_use", id: "toolu_1", name: "Bash", input: { command: "echo SECRET-TOKEN-123" } }
+    result = { type: "tool_result", tool_use_id: "toolu_1", content: "SECRET-TOKEN-123" }
+    prompt_text = "my password is hunter2"
+
+    with_session([user_turn(prompt_text), assistant_parts([call]), user_parts([result])]) do |reader|
+      loop = Agent::SessionContext::Loop.for(reader)
+
+      renderings = {
+        text: Agent::SessionContext::Renderers::Text.new.call(loop),
+        markdown: Agent::SessionContext::Renderers::Markdown.new.call(loop),
+        json: Agent::SessionContext::Renderers::JSON.new.call(loop),
+        jsonl: Agent::SessionContext::Renderers::JSONLines.new.call(loop)
+      }
+
+      renderings.each do |format, rendered|
+        refute_includes rendered, "SECRET-TOKEN-123", "#{format} leaked the tool result body"
+        refute_includes rendered, "hunter2", "#{format} leaked the prompt body"
+        refute_includes rendered, "password", "#{format} leaked the prompt body"
+      end
+    end
   end
 
   private

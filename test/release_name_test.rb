@@ -25,7 +25,7 @@ class ReleaseNameTest < Minitest::Test
   end
 
   def test_gemspec_uses_the_new_distribution_name
-    path = File.join(ROOT, "agent-session_context.gemspec")
+    path = File.join(ROOT, "agent_session_context.gemspec")
 
     assert File.file?(path)
     return unless File.file?(path)
@@ -33,7 +33,7 @@ class ReleaseNameTest < Minitest::Test
     spec = Gem::Specification.load(path)
 
     refute_nil spec
-    assert_equal "agent-session_context", spec.name
+    assert_equal "agent_session_context", spec.name
     assert_equal ["agent-session-context"], spec.executables
   end
 
@@ -44,5 +44,6 @@ class ReleaseNameTest < Minitest::Test
     refute_path_exists File.join(LIB, "agent", "context.rb")
     refute_path_exists File.join(LIB, "agent", "context")
     refute_path_exists File.join(ROOT, "agent_context.gemspec")
+    refute_path_exists File.join(ROOT, "agent-session_context.gemspec")
   end
 end
