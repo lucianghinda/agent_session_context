@@ -105,11 +105,21 @@ Show a session as the agent loop:
 agent-session-context loop --current
 ```
 
-Print prompts, model round trips, tool calls paired with their results, and where the session stopped.
+Print prompts, model entries, tool calls paired with their results, and the last recorded state.
+
+The entry count includes prompts and tool results. Where the store provides no response grouping
+(including Codex), each message is a separate entry; neither total entries nor model entries
+is a proven count of API requests. JSON retains the `round_trips` field and its `recorded` flags.
 
 Print byte sizes and tool names only, never prompt or tool-result bodies.
 
-Expect the ending to always read as inferred: no store on disk records why a session stopped.
+The ending is inferred from the last normalized entry; a session may resume after the snapshot.
+Codex commentary and reasoning tails are `incomplete`, while a `final_answer` message is
+`answered`. Legacy assistant messages without a phase retain the existing inference.
+
+Codex token accounting is handled by `agent_sessions` 0.4.1 or later and adds no conversation
+entries or unknown-record warnings. Human CLI diagnostics appear once on stderr; standalone
+Ruby views and JSON retain their warnings.
 
 Expect deterministic output: render the same session the same way regardless of machine or time zone.
 
@@ -159,7 +169,7 @@ Read a session as the agent loop:
 
 ```ruby
 loop = Agent::SessionContext.loop(session)
-loop.ending #=> :answered, :stopped_in_the_loop, :not_a_model_record, or :empty
+loop.ending #=> :answered, :incomplete, :stopped_in_the_loop, :not_a_model_record, or :empty
 ```
 
 Create a summary with built-in settings:

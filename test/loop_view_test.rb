@@ -2,9 +2,11 @@
 
 require "test_helper"
 require_relative "support/claude_fixtures"
+require_relative "support/codex_fixtures"
 
 class LoopViewTest < Minitest::Test
   include ClaudeFixtures
+  include CodexFixtures
 
   # A renderer that drops the round-trip count from one format disagrees with
   # the other two about the same underlying Loop — the three outputs describe
@@ -31,9 +33,8 @@ class LoopViewTest < Minitest::Test
     end
   end
 
-  # A renderer that prints a stop REASON claims a fact the on-disk transcript
-  # does not hold — no store records why a run stopped — so every rendering
-  # must say "inferred", not state the ending as if it were recorded.
+  # This view infers the ending from the last entry rather than normalizing
+  # lifecycle events, so every rendering must label it inferred.
   def test_every_rendering_marks_the_ending_inferred
     call = { type: "tool_use", id: "toolu_1", name: "Read", input: { file_path: "/tmp/x" } }
 
@@ -176,7 +177,43 @@ class LoopViewTest < Minitest::Test
     with_session([user_turn("hi"), assistant_turn("ok")]) do |reader|
       view = view_for(reader)
       assert_includes view.ascii, "none named by the store"
-      assert_includes view.ascii, "one round trip per message"
+      assert_includes view.ascii, "one entry per message"
+    end
+  end
+
+  def test_assumed_entries_do_not_claim_model_round_trips_or_exits
+    call = { type: "tool_use", id: "toolu_1", name: "Read", input: {} }
+    with_session([user_turn("hi"), assistant_turn("checking"), assistant_parts([call])]) do |reader|
+      view = view_for(reader)
+      assert_includes view.ascii, "entries: 3"
+      assert_includes view.ascii, "model entries: 2"
+      assert_includes view.ascii, "== message ==>"
+      assert_includes view.ascii, "no tool request in this record"
+      assert_includes view.ascii, "tool request recorded"
+      refute_includes view.ascii, "no tool_use: exit"
+      assert_includes view.markdown, "entries: 3"
+      assert_includes view.markdown, "model entries: 2"
+    end
+  end
+
+  def test_standalone_views_keep_warnings_by_default
+    with_session([user_parts([{ type: "tool_result", tool_use_id: "orphan", content: "x" }])]) do |reader|
+      view = view_for(reader)
+      assert_includes view.ascii, "tool result orphan answers no call"
+      assert_includes view.markdown, "tool result orphan answers no call"
+    end
+  end
+
+  def test_codex_reasoning_without_a_summary_is_visible_without_leaking_content
+    record = codex_reasoning
+    record[:payload][:encrypted_content] = "PRIVATE-REASONING"
+    with_codex_session([record]) do |reader|
+      view = view_for(reader)
+      [view.ascii, view.markdown].each do |rendering|
+        assert_includes rendering, "reasoning (no readable summary recorded)"
+        refute_includes rendering, "PRIVATE-REASONING"
+      end
+      refute_includes view.to_h.inspect, "PRIVATE-REASONING"
     end
   end
 
