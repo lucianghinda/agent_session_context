@@ -5,6 +5,14 @@
 - **BREAKING**: the gem is now distributed as `agent_session_context`. The
   namespace, require path, and executable are unchanged; users change only
   the Gemfile line.
+- Add the `loop` command and `Agent::SessionContext.loop`, showing a session
+  as the agent loop: prompts, model round trips, tool calls paired with
+  their results, and where it stopped. Moved from `agent_sessions` before it
+  shipped there, since this gem interprets what a store recorded rather than
+  normalizing it. Prints byte sizes and tool names, never prompt or
+  tool-result bodies; renders the same session the same way regardless of
+  machine or time zone; and always labels the ending inferred, since no
+  on-disk transcript records why a session stopped.
 
 ## [0.1.0] - 2026-09-01
 

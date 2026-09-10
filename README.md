@@ -97,6 +97,24 @@ Expect `show` to exclude assistant messages, thinking, tool-result bodies, and r
 
 Use `show` and `prompts` without starting a model.
 
+### Agent Loop
+
+Show a session as the agent loop:
+
+```bash
+agent-session-context loop --current
+```
+
+Print prompts, model round trips, tool calls paired with their results, and where the session stopped.
+
+Print byte sizes and tool names only, never prompt or tool-result bodies.
+
+Expect the ending to always read as inferred: no store on disk records why a session stopped.
+
+Expect deterministic output: render the same session the same way regardless of machine or time zone.
+
+Render `loop` as text, Markdown, JSON, or JSON Lines with `--format`.
+
 ### Summaries
 
 Create a grounded summary:
@@ -137,6 +155,13 @@ session = Agent::SessionContext.current(agent: :codex, env: {})
 prompts = Agent::SessionContext.prompts(session)
 ```
 
+Read a session as the agent loop:
+
+```ruby
+loop = Agent::SessionContext.loop(session)
+loop.ending #=> :answered, :stopped_in_the_loop, :not_a_model_record, or :empty
+```
+
 Create a summary with built-in settings:
 
 ```ruby
@@ -166,9 +191,13 @@ Pass either `summarizer:` or `timeout:`, never both.
 
 `Agent::SessionContext.prompts` returns an array of `Agent::SessionContext::Prompt` values.
 
+`Agent::SessionContext.loop` returns an `Agent::SessionContext::Loop`.
+
 `Agent::SessionContext.summarize` returns an `Agent::SessionContext::Snapshot` populated with summary `Agent::SessionContext::Item` values and summary metadata.
 
 `Agent::SessionContext::Snapshot`, `Agent::SessionContext::Prompt`, `Agent::SessionContext::InjectedContext`, `Agent::SessionContext::Item`, and `Agent::SessionContext::SourceRef` are part of the supported public data model.
+
+`Agent::SessionContext::Loop` and `Agent::SessionContext::ToolCall` are part of the supported public data model. `Agent::SessionContext::LoopView` is internal.
 
 `Agent::SessionContext::VERSION` is public.
 
@@ -230,6 +259,7 @@ Apply the timeout to each provider call.
 |---|---|
 | `show` | `text`, `markdown`, `json` |
 | `prompts` | `text`, `markdown`, `json`, `jsonl` |
+| `loop` | `text`, `markdown`, `json`, `jsonl` |
 | `summarize` | `text`, `markdown`, `json` |
 
 ### Errors
