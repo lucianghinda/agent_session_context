@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-10
+
+- Final release under this name. Renamed to `agent_session_context`.
+
 ## [0.1.0] - 2026-09-01
 
 - Use the `agent-session_context` distribution, `Agent::SessionContext`

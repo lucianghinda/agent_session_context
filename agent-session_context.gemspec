@@ -27,4 +27,11 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
   spec.add_dependency "agent_sessions", "~> 0.3"
   spec.add_dependency "zeitwerk", "~> 2.8"
+  spec.post_install_message = <<~MESSAGE
+    This gem has been renamed to `agent_session_context`.
+    `agent-session_context` will receive no further releases.
+    Switch your Gemfile to: gem "agent_session_context"
+    The `Agent::SessionContext` namespace and the `agent-session-context`
+    executable are unchanged, so no code changes are needed.
+  MESSAGE
 end

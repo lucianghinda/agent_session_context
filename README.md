@@ -1,3 +1,10 @@
+> **This gem has been renamed to `agent_session_context`.**
+> `agent-session_context` will receive no further releases.
+> Switch your Gemfile to: `gem "agent_session_context"`.
+> The `Agent::SessionContext` namespace and the `agent-session-context`
+> executable are unchanged, so no code changes are needed.
+> New repository: <https://github.com/lucianghinda/agent_session_context>
+
 # Agent Session Context
 
 [![Build](https://github.com/lucianghinda/agent-session-context/actions/workflows/main.yml/badge.svg)](https://github.com/lucianghinda/agent-session-context/actions/workflows/main.yml)
